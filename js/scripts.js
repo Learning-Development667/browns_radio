@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.2.0';
 
   /* ---------- playlist ---------- */
   var songs = (typeof SONGS !== 'undefined' && Array.isArray(SONGS)) ? SONGS : [];
@@ -145,7 +145,7 @@
         '0%, ' + pausePct + '% { transform: translateX(0); }' +
         '100% { transform: translateX(-' + distance + 'px); }' +
         '}';
-      lcdTitle.style.animation = 'lcd-ticker ' + total.toFixed(2) + 's linear infinite';
+      lcdTitle.style.animation = 'lcd-ticker ' + total.toFixed(2) + 's ease-in-out infinite';
     });
   }
 
@@ -185,12 +185,24 @@
     btnPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   }
 
+  var trackUiReady = false;
+  function flashLcdTitle() {
+    var wrap = lcdTitle.parentElement;
+    if (!wrap) return;
+    wrap.classList.remove('tc');
+    void wrap.offsetWidth; // reflow so the animation can restart
+    wrap.classList.add('tc');
+  }
+
   function updateTrackUI() {
     if (!hasTracks) return;
     var song = songs[current];
     setLcdTitle(song.title || 'UNTITLED');
     lcdFreq.textContent = trackFreq(current);
     ssTitle.textContent = song.title || 'UNTITLED';
+    // Subtle retune flash on genuine track changes (skip the first render).
+    if (trackUiReady) flashLcdTitle();
+    trackUiReady = true;
     trackRows.forEach(function (row, i) {
       row.classList.toggle('current', i === current);
     });
@@ -460,6 +472,10 @@
   /* ============================================================
      track list
      ============================================================ */
+  // Track which rows have already animated in, so a re-render never
+  // re-triggers the staggered entrance for items already on screen.
+  var renderedRowIds = new Set();
+
   function buildTracklist() {
     tracklistEl.innerHTML = '';
     trackRows = [];
@@ -488,6 +504,13 @@
         if (shuffleOn) buildShuffleOrder(i);
         loadTrack(i, true);
       });
+      // Staggered fade-in from below — first appearance only.
+      var rowId = song.file || ('idx-' + i);
+      if (!renderedRowIds.has(rowId)) {
+        renderedRowIds.add(rowId);
+        row.classList.add('row-in');
+        row.style.animationDelay = (i * 0.07) + 's';
+      }
       tracklistEl.appendChild(row);
       trackRows.push(row);
     });
@@ -701,7 +724,7 @@
       if (p.y < -10) { p.y = h + 10; p.x = Math.random() * w; }
       ctx.beginPath();
       ctx.arc(x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(232, 98, 26, ' + p.alpha.toFixed(3) + ')';
+      ctx.fillStyle = 'rgba(0, 163, 255, ' + p.alpha.toFixed(3) + ')';
       ctx.fill();
     }
     embersRafId = requestAnimationFrame(embersLoop);

@@ -105,6 +105,44 @@
     white-space: nowrap;
   }
 
+  /* ---------- forge-laser rotating comet border (from Mark One Apps) ---------- */
+  @property --forgeAngle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  @keyframes forgTrace {
+    to { --forgeAngle: 360deg; }
+  }
+
+  .forge-laser {
+    position: relative;
+  }
+
+  .forge-laser::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 22px;
+    padding: 2px;
+    /* Narrow comet: bright electric-blue head with a short fade trail, then
+       transparent the rest of the way so it reads as one tight sweep. */
+    background: conic-gradient(from var(--forgeAngle, 0deg),
+                #cfeeff 0deg,
+                #00A3FF 7deg,
+                rgba(0, 163, 255, 0.55) 18deg,
+                rgba(0, 163, 255, 0) 36deg,
+                rgba(0, 163, 255, 0) 360deg);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: forgTrace 3s linear infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+
   /* ---------- radio face ---------- */
   .radio {
     background: linear-gradient(180deg, #1e3866 0%, #152c52 45%, #102341 100%);
@@ -198,8 +236,18 @@
   }
 
   .lcd-ind.on {
-    color: var(--orange);
-    text-shadow: 0 0 9px rgba(232, 98, 26, 0.75);
+    color: var(--blue);
+    text-shadow: 0 0 9px rgba(0, 163, 255, 0.85);
+  }
+
+  /* Brief retune fade on the LCD title whenever the track changes (no snap). */
+  .lcd-title-wrap.tc { animation: lcd-retune 0.5s ease both; }
+
+  @keyframes lcd-retune {
+    0%   { opacity: 0.2; filter: blur(1.2px); }
+    55%  { opacity: 0.85; filter: blur(0); }
+    70%  { opacity: 0.5; }
+    100% { opacity: 1; }
   }
 
   .lcd-title-wrap {
@@ -327,7 +375,7 @@
     transition: transform 0.12s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   }
 
-  .btn:active { transform: scale(0.9); }
+  .btn:active { transform: scale(0.95); }
 
   .btn svg { fill: var(--cream); pointer-events: none; }
 
@@ -376,14 +424,14 @@
   }
 
   .btn-mode.on {
-    color: var(--orange);
-    border-color: rgba(232, 98, 26, 0.6);
+    color: var(--blue-light);
+    border-color: rgba(0, 163, 255, 0.6);
     box-shadow:
       0 5px 12px rgba(0, 0, 0, 0.5),
-      0 0 18px rgba(232, 98, 26, 0.35),
+      0 0 20px rgba(0, 163, 255, 0.45),
       inset 0 1px 0 rgba(245, 240, 232, 0.14),
       inset 0 -3px 6px rgba(0, 0, 0, 0.4);
-    text-shadow: 0 0 10px rgba(232, 98, 26, 0.6);
+    text-shadow: 0 0 10px rgba(0, 163, 255, 0.7);
   }
 
   /* ---------- presets ---------- */
@@ -400,6 +448,11 @@
     font-size: 1.05rem;
     font-weight: 500;
     color: var(--cream-dim);
+    /* Extra inset shadow so presets read as physical, raised radio buttons. */
+    box-shadow:
+      0 5px 12px rgba(0, 0, 0, 0.5),
+      inset 0 2px 0 rgba(245, 240, 232, 0.16),
+      inset 0 -4px 8px rgba(0, 0, 0, 0.5);
   }
 
   .btn-preset.active {
@@ -452,9 +505,29 @@
 
   #tracklist li:active { background: rgba(0, 163, 255, 0.1); }
 
+  /* Staggered fade-in from below — applied on first render only (JS Set-guarded). */
+  #tracklist li.row-in { animation: row-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   #tracklist li.current {
-    border-left-color: var(--blue);
     background: rgba(0, 163, 255, 0.08);
+    animation: current-glow 2s ease-in-out infinite;
+  }
+
+  /* Animated electric-blue left border on the playing track. */
+  @keyframes current-glow {
+    0%, 100% {
+      border-left-color: rgba(0, 163, 255, 0.55);
+      box-shadow: inset 2px 0 8px -4px rgba(0, 163, 255, 0.45);
+    }
+    50% {
+      border-left-color: var(--blue-light);
+      box-shadow: inset 3px 0 15px -3px rgba(0, 163, 255, 0.85);
+    }
   }
 
   #tracklist li.current .t-title { color: var(--blue-light); }
@@ -543,10 +616,53 @@
 
   #ss-eq { display: block; width: 100%; height: 30px; }
 
+  /* ---------- Mark One Apps footer signature ---------- */
+  .m1a-footer {
+    grid-column: 1 / -1;
+    margin-top: 30px;
+    padding: 22px 0 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid rgba(245, 240, 232, 0.08);
+    animation: app-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: 0.4s;
+  }
+
+  /* Exact Mark One Apps logo animations (copied from the Forge App repo). */
+  .m1-logo {
+    width: 88px;
+    height: auto;
+    display: block;
+    opacity: 0.85;
+  }
+
+  @keyframes m1BoltPulse {
+    0%, 100% { filter: drop-shadow(0 0 4px #3B82F6); }
+    50% { filter: drop-shadow(0 0 14px #60A5FA) drop-shadow(0 0 28px #93C5FD); }
+  }
+
+  @keyframes m1Shimmer {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  .m1-bolt { animation: m1BoltPulse 2.5s ease-in-out infinite; }
+
+  .m1a-caption {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--cream);
+    opacity: 0.4;
+  }
+
   /* ---------- version ---------- */
   .version {
     position: fixed;
-    right: calc(10px + env(safe-area-inset-right));
+    left: calc(12px + env(safe-area-inset-left));
     bottom: calc(8px + env(safe-area-inset-bottom));
     z-index: 2;
     font-family: 'DM Mono', monospace;
@@ -581,7 +697,7 @@
       <span class="tagline">Personal FM</span>
     </header>
 
-    <section class="radio" aria-label="Radio">
+    <section class="radio forge-laser" aria-label="Radio">
       <div class="lcd">
         <div class="lcd-content">
           <div class="lcd-row-top">
@@ -633,6 +749,40 @@
       <h2>TRACK LIST</h2>
       <ul id="tracklist"></ul>
     </section>
+
+    <footer class="m1a-footer">
+      <svg class="m1-logo" width="120" height="127" viewBox="0 0 180 190" aria-hidden="true">
+        <g fill="#1d4ed8" stroke="#60A5FA" stroke-width="0.8" opacity="0.9">
+          <ellipse cx="38" cy="145" rx="5" ry="11" transform="rotate(-80 38 145)" style="animation:m1Shimmer 2s infinite 0s"/>
+          <ellipse cx="28" cy="128" rx="5" ry="11" transform="rotate(-65 28 128)" style="animation:m1Shimmer 2s infinite 0.15s"/>
+          <ellipse cx="22" cy="108" rx="5" ry="11" transform="rotate(-50 22 108)" style="animation:m1Shimmer 2s infinite 0.3s"/>
+          <ellipse cx="22" cy="87" rx="5" ry="11" transform="rotate(-35 22 87)" style="animation:m1Shimmer 2s infinite 0.45s"/>
+          <ellipse cx="28" cy="67" rx="5" ry="11" transform="rotate(-20 28 67)" style="animation:m1Shimmer 2s infinite 0.6s"/>
+          <ellipse cx="40" cy="50" rx="5" ry="11" transform="rotate(-5 40 50)" style="animation:m1Shimmer 2s infinite 0.75s"/>
+          <ellipse cx="57" cy="38" rx="5" ry="11" transform="rotate(12 57 38)" style="animation:m1Shimmer 2s infinite 0.9s"/>
+          <ellipse cx="142" cy="145" rx="5" ry="11" transform="rotate(80 142 145)" style="animation:m1Shimmer 2s infinite 0.08s"/>
+          <ellipse cx="152" cy="128" rx="5" ry="11" transform="rotate(65 152 128)" style="animation:m1Shimmer 2s infinite 0.23s"/>
+          <ellipse cx="158" cy="108" rx="5" ry="11" transform="rotate(50 158 108)" style="animation:m1Shimmer 2s infinite 0.38s"/>
+          <ellipse cx="158" cy="87" rx="5" ry="11" transform="rotate(35 158 87)" style="animation:m1Shimmer 2s infinite 0.53s"/>
+          <ellipse cx="152" cy="67" rx="5" ry="11" transform="rotate(20 152 67)" style="animation:m1Shimmer 2s infinite 0.68s"/>
+          <ellipse cx="140" cy="50" rx="5" ry="11" transform="rotate(5 140 50)" style="animation:m1Shimmer 2s infinite 0.83s"/>
+          <ellipse cx="123" cy="38" rx="5" ry="11" transform="rotate(-12 123 38)" style="animation:m1Shimmer 2s infinite 0.98s"/>
+        </g>
+        <g transform="translate(90,78)" class="m1-bolt">
+          <polygon points="8,-28 -8,6 2,6 -6,28 10,-4 0,-4" fill="#3B82F6" stroke="#93C5FD" stroke-width="1"/>
+        </g>
+        <g transform="translate(90,138)">
+          <ellipse cx="0" cy="0" rx="24" ry="15" fill="none" stroke="#3B82F6" stroke-width="1.6"/>
+          <ellipse cx="0" cy="0" rx="11" ry="15" fill="none" stroke="#3B82F6" stroke-width="0.9" opacity="0.55"/>
+          <line x1="-24" y1="0" x2="24" y2="0" stroke="#3B82F6" stroke-width="0.9" opacity="0.55" stroke-dasharray="3 2">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="2s" repeatCount="indefinite"/>
+          </line>
+          <line x1="0" y1="-15" x2="0" y2="15" stroke="#3B82F6" stroke-width="0.8" opacity="0.35"/>
+          <ellipse cx="0" cy="0" rx="24" ry="8" fill="none" stroke="#3B82F6" stroke-width="0.7" opacity="0.3"/>
+        </g>
+      </svg>
+      <p class="m1a-caption">Mark One Apps</p>
+    </footer>
   </div>
 
   <div id="screensaver" aria-hidden="true">
@@ -643,12 +793,12 @@
     </div>
   </div>
 
-  <span class="version">v1.1.0</span>
+  <span class="version">v1.2.0</span>
 
   <audio id="audio" preload="metadata" playsinline></audio>
 
-  <script src="content/songs.js?v=1.1.0"></script>
-  <script src="js/scripts.js?v=1.1.0"></script>
+  <script src="content/songs.js?v=1.2.0"></script>
+  <script src="js/scripts.js?v=1.2.0"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
