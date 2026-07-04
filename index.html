@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Browns Radio</title>
+<meta name="description" content="Personal digital car radio for your own songs.">
+<meta name="theme-color" content="#13294B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Browns Radio">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --navy: #13294B;
+    --navy-deep: #0c1b33;
+    --blue: #00A3FF;
+    --blue-soft: rgba(0, 163, 255, 0.35);
+    --blue-light: #7FD4FF;
+    --orange: #E8621A;
+    --cream: #F5F0E8;
+    --cream-dim: rgba(245, 240, 232, 0.55);
+    --lcd-green: #9fe8b0;
+    --lcd-amber: #ffd18a;
+    --bezel: #1d3560;
+    --bezel-dark: #0e2040;
+    --btn-face: linear-gradient(180deg, #24406f 0%, #16294c 55%, #0f1f3d 100%);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: radial-gradient(120% 90% at 50% 0%, #1a3562 0%, var(--navy) 45%, var(--navy-deep) 100%);
+    color: var(--cream);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ---------- ember particles behind everything ---------- */
+  #embers {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 14px 16px 40px;
+    animation: app-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: 0.15s;
+  }
+
+  @keyframes app-enter {
+    from { opacity: 0; transform: translateY(26px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 6px 4px 12px;
+    overflow: hidden;
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    letter-spacing: 0.09em;
+    color: var(--cream);
+    text-shadow: 0 0 22px rgba(0, 163, 255, 0.35);
+    line-height: 1;
+  }
+
+  header h1 .accent { color: var(--blue); }
+
+  header .tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.22em;
+    color: var(--cream-dim);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ---------- radio face ---------- */
+  .radio {
+    background: linear-gradient(180deg, #1e3866 0%, #152c52 45%, #102341 100%);
+    border: 1px solid rgba(127, 212, 255, 0.14);
+    border-radius: 22px;
+    padding: 14px 14px 18px;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(245, 240, 232, 0.10),
+      inset 0 -3px 10px rgba(0, 0, 0, 0.45);
+  }
+
+  /* ---------- LCD ---------- */
+  .lcd {
+    position: relative;
+    background: #0a0a0a;
+    border-radius: 12px;
+    border: 1px solid #000;
+    padding: 12px 14px 8px;
+    box-shadow:
+      inset 0 4px 18px rgba(0, 0, 0, 0.9),
+      inset 0 0 44px rgba(159, 232, 176, 0.05),
+      0 1px 0 rgba(245, 240, 232, 0.07);
+    overflow: hidden;
+    animation: lcd-boot 1.4s steps(1, end) both;
+  }
+
+  /* faint green/amber tint + scanlines (cheap: single gradient layer) */
+  .lcd::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg,
+        rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 1px,
+        transparent 1px, transparent 3px),
+      linear-gradient(160deg,
+        rgba(159, 232, 176, 0.06) 0%,
+        rgba(255, 209, 138, 0.045) 60%,
+        rgba(159, 232, 176, 0.05) 100%);
+    border-radius: 12px;
+  }
+
+  @keyframes lcd-boot {
+    0%   { opacity: 0; }
+    8%   { opacity: 0.9; }
+    12%  { opacity: 0.15; }
+    20%  { opacity: 1; }
+    26%  { opacity: 0.35; }
+    34%  { opacity: 1; }
+    42%  { opacity: 0.75; }
+    50%, 100% { opacity: 1; }
+  }
+
+  .lcd-content {
+    position: relative;
+    font-family: 'DM Mono', monospace;
+    animation: lcd-content-in 0.8s ease-out both;
+    animation-delay: 1.2s;
+  }
+
+  @keyframes lcd-content-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .lcd-row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    color: var(--lcd-amber);
+    text-shadow: 0 0 8px rgba(255, 209, 138, 0.5);
+  }
+
+  .lcd-station { white-space: nowrap; }
+  .lcd-freq { color: var(--lcd-green); text-shadow: 0 0 8px rgba(159, 232, 176, 0.5); }
+
+  .lcd-indicators {
+    display: flex;
+    gap: 10px;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+  }
+
+  .lcd-ind {
+    color: rgba(245, 240, 232, 0.12);
+    transition: color 0.3s, text-shadow 0.3s;
+  }
+
+  .lcd-ind.on {
+    color: var(--orange);
+    text-shadow: 0 0 9px rgba(232, 98, 26, 0.75);
+  }
+
+  .lcd-title-wrap {
+    margin: 12px 0 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  }
+
+  .lcd-title {
+    display: inline-block;
+    font-size: 1.12rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--lcd-green);
+    text-shadow: 0 0 12px rgba(159, 232, 176, 0.6);
+    will-change: transform;
+  }
+
+  .lcd-row-bottom {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--lcd-green);
+    text-shadow: 0 0 8px rgba(159, 232, 176, 0.45);
+    margin-bottom: 8px;
+  }
+
+  #eq {
+    display: block;
+    width: 100%;
+    height: 56px;
+    position: relative;
+  }
+
+  #eq.hidden { display: none; }
+
+  /* ---------- seek ---------- */
+  .seek-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 4px 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--cream-dim);
+  }
+
+  .seek-row .time { min-width: 42px; text-align: center; }
+
+  #seek {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 34px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  #seek::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+    background:
+      linear-gradient(90deg, var(--blue) 0%, var(--blue) var(--seek-fill, 0%), #0c1b33 var(--seek-fill, 0%));
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+  }
+
+  #seek::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    margin-top: -9px;
+    background: radial-gradient(circle at 35% 30%, #cfeeff, var(--blue) 65%);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 12px var(--blue-soft), 0 3px 6px rgba(0, 0, 0, 0.5);
+  }
+
+  #seek::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: #0c1b33;
+  }
+
+  #seek::-moz-range-progress {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--blue);
+  }
+
+  #seek::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #cfeeff, var(--blue) 65%);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 12px var(--blue-soft), 0 3px 6px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ---------- transport ---------- */
+  .transport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    margin: 10px 0 4px;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    color: var(--cream);
+    background: var(--btn-face);
+    border: 1px solid rgba(127, 212, 255, 0.16);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow:
+      0 5px 12px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(245, 240, 232, 0.14),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+    transition: transform 0.12s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+
+  .btn:active { transform: scale(0.9); }
+
+  .btn svg { fill: var(--cream); pointer-events: none; }
+
+  .btn-skip { width: 66px; height: 66px; }
+  .btn-skip svg { width: 30px; height: 30px; }
+
+  .btn-play {
+    width: 92px;
+    height: 92px;
+    border-color: rgba(0, 163, 255, 0.45);
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.55),
+      0 0 22px rgba(0, 163, 255, 0.22),
+      inset 0 1px 0 rgba(245, 240, 232, 0.16),
+      inset 0 -4px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn-play svg { width: 42px; height: 42px; fill: var(--blue-light); }
+
+  .btn-play.playing {
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.55),
+      0 0 34px rgba(0, 163, 255, 0.5),
+      inset 0 1px 0 rgba(245, 240, 232, 0.16),
+      inset 0 -4px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn:disabled:active { transform: none; }
+
+  /* ---------- mode buttons ---------- */
+  .modes {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin: 14px 0 6px;
+  }
+
+  .btn-mode {
+    border-radius: 12px;
+    min-width: 108px;
+    height: 48px;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    gap: 6px;
+  }
+
+  .btn-mode.on {
+    color: var(--orange);
+    border-color: rgba(232, 98, 26, 0.6);
+    box-shadow:
+      0 5px 12px rgba(0, 0, 0, 0.5),
+      0 0 18px rgba(232, 98, 26, 0.35),
+      inset 0 1px 0 rgba(245, 240, 232, 0.14),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 0 10px rgba(232, 98, 26, 0.6);
+  }
+
+  /* ---------- presets ---------- */
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .btn-preset {
+    border-radius: 10px;
+    height: 54px;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--cream-dim);
+  }
+
+  .btn-preset.active {
+    color: var(--blue-light);
+    border-color: rgba(0, 163, 255, 0.6);
+    box-shadow:
+      0 5px 12px rgba(0, 0, 0, 0.5),
+      0 0 16px rgba(0, 163, 255, 0.4),
+      inset 0 1px 0 rgba(245, 240, 232, 0.14),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 0 10px rgba(0, 163, 255, 0.7);
+  }
+
+  .btn-preset:disabled { opacity: 0.28; }
+
+  /* ---------- track list ---------- */
+  .tracklist-section { margin-top: 22px; }
+
+  .tracklist-section h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.15rem;
+    letter-spacing: 0.14em;
+    color: var(--cream-dim);
+    padding: 0 6px 8px;
+  }
+
+  #tracklist {
+    list-style: none;
+    background: rgba(10, 18, 36, 0.55);
+    border: 1px solid rgba(127, 212, 255, 0.1);
+    border-radius: 14px;
+    overflow: hidden;
+    max-height: 42vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #tracklist li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid rgba(127, 212, 255, 0.06);
+    cursor: pointer;
+    transition: background 0.25s, border-color 0.25s;
+  }
+
+  #tracklist li:last-child { border-bottom: none; }
+
+  #tracklist li:active { background: rgba(0, 163, 255, 0.1); }
+
+  #tracklist li.current {
+    border-left-color: var(--blue);
+    background: rgba(0, 163, 255, 0.08);
+  }
+
+  #tracklist li.current .t-title { color: var(--blue-light); }
+
+  #tracklist .t-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--cream-dim);
+    min-width: 20px;
+    text-align: right;
+  }
+
+  #tracklist .t-title {
+    flex: 1;
+    font-size: 0.92rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.25s;
+  }
+
+  #tracklist .t-dur {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--cream-dim);
+  }
+
+  #tracklist .empty {
+    cursor: default;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--cream-dim);
+    padding: 22px 14px;
+  }
+
+  /* ---------- screensaver ---------- */
+  #screensaver {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: #020409;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.4s ease;
+  }
+
+  #screensaver.active {
+    opacity: 0.985;
+    pointer-events: auto;
+  }
+
+  .ss-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 240px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: rgba(13, 26, 48, 0.55);
+    border: 1px solid rgba(0, 163, 255, 0.14);
+    text-align: center;
+    will-change: transform;
+  }
+
+  .ss-panel .ss-ident {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.28em;
+    color: var(--orange);
+    opacity: 0.8;
+  }
+
+  .ss-panel .ss-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.86rem;
+    color: var(--lcd-green);
+    text-shadow: 0 0 10px rgba(159, 232, 176, 0.5);
+    margin: 10px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #ss-eq { display: block; width: 100%; height: 30px; }
+
+  /* ---------- version ---------- */
+  .version {
+    position: fixed;
+    right: calc(10px + env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 2;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    color: var(--cream);
+    opacity: 0.28;
+    pointer-events: none;
+  }
+
+  /* ---------- landscape (dash mount) ---------- */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .app {
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: minmax(0, 30fr) minmax(0, 23fr);
+      column-gap: 22px;
+      align-items: start;
+    }
+    header { grid-column: 1 / -1; }
+    .tracklist-section { margin-top: 0; }
+    #tracklist { max-height: 62vh; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="embers" aria-hidden="true"></canvas>
+
+  <div class="app">
+    <header>
+      <h1>BROWNS<span class="accent">&nbsp;RADIO</span></h1>
+      <span class="tagline">Personal FM</span>
+    </header>
+
+    <section class="radio" aria-label="Radio">
+      <div class="lcd">
+        <div class="lcd-content">
+          <div class="lcd-row-top">
+            <span class="lcd-station">BROWNS FM <span class="lcd-freq" id="lcd-freq">&#8212;&#8212;.&#8212;</span></span>
+            <span class="lcd-indicators">
+              <span class="lcd-ind" id="ind-shuffle">SHFL</span>
+              <span class="lcd-ind" id="ind-repeat">RPT</span>
+            </span>
+          </div>
+          <div class="lcd-title-wrap">
+            <span class="lcd-title" id="lcd-title">BROWNS RADIO</span>
+          </div>
+          <div class="lcd-row-bottom">
+            <span id="lcd-elapsed">0:00</span>
+            <span id="lcd-total">0:00</span>
+          </div>
+          <canvas id="eq"></canvas>
+        </div>
+      </div>
+
+      <div class="seek-row">
+        <span class="time" id="seek-elapsed">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+        <span class="time" id="seek-remaining">-0:00</span>
+      </div>
+
+      <div class="transport">
+        <button class="btn btn-skip" id="btn-prev" aria-label="Previous track">
+          <svg viewBox="0 0 24 24"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+        </button>
+        <button class="btn btn-play" id="btn-play" aria-label="Play">
+          <svg viewBox="0 0 24 24" id="icon-play"><path d="M7 4.5v15l13-7.5z"/></svg>
+          <svg viewBox="0 0 24 24" id="icon-pause" style="display:none"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>
+        </button>
+        <button class="btn btn-skip" id="btn-next" aria-label="Next track">
+          <svg viewBox="0 0 24 24"><path d="M15.5 5H18v14h-2.5zM4 5l10.5 7L4 19z"/></svg>
+        </button>
+      </div>
+
+      <div class="modes">
+        <button class="btn btn-mode" id="btn-repeat" aria-label="Repeat mode">RPT OFF</button>
+        <button class="btn btn-mode" id="btn-shuffle" aria-label="Shuffle">SHUFFLE</button>
+      </div>
+
+      <div class="presets" id="presets"></div>
+    </section>
+
+    <section class="tracklist-section" aria-label="Track list">
+      <h2>TRACK LIST</h2>
+      <ul id="tracklist"></ul>
+    </section>
+  </div>
+
+  <div id="screensaver" aria-hidden="true">
+    <div class="ss-panel" id="ss-panel">
+      <div class="ss-ident">BROWNS FM</div>
+      <div class="ss-title" id="ss-title">&nbsp;</div>
+      <canvas id="ss-eq"></canvas>
+    </div>
+  </div>
+
+  <span class="version">v1.0.0</span>
+
+  <audio id="audio" preload="metadata" playsinline></audio>
+
+  <script src="content/songs.js?v=1.0.0"></script>
+  <script src="js/scripts.js?v=1.0.0"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
