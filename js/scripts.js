@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.0.0';
+  var APP_VERSION = '1.1.0';
 
   /* ---------- playlist ---------- */
   var songs = (typeof SONGS !== 'undefined' && Array.isArray(SONGS)) ? SONGS : [];

@@ -19,7 +19,6 @@
    ============================================================ */
 
 const SONGS = [
-  // { title: 'Midnight Drive',     file: 'music/midnight-drive.m4a',     preset: 1 },
-  // { title: 'Coast Road',         file: 'music/coast-road.mp4',         preset: 2 },
-  // { title: 'Ember Street Blues', file: 'music/ember-street-blues.m4a' },
+  { title: 'Forever You and Me', file: 'music/forever-you-and-me.mp3', preset: 1 },
+  { title: "That's My Boy",      file: 'music/thats-my-boy.mp3',       preset: 2 },
 ];
