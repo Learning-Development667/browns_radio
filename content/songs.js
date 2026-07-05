@@ -29,4 +29,5 @@ const SONGS = [
   { title: "That's My Boy",      file: 'music/thats-my-boy.mp3',       preset: 2 },
   { title: 'Addison-Ann Lili',   file: 'music/addison-ann-lili.mp3',   station: 'Addison-Ann FM' },
   { title: 'Little Bird',        file: 'music/little-bird.mp3',        station: 'Addison-Ann FM' },
+  { title: 'Doggo Dog Hunt',     file: 'music/doggo-dog-hunt.mp3',     station: 'Addison-Ann FM' },
 ];
