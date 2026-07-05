@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.2.0';
+  var APP_VERSION = '1.3.0';
 
   /* ---------- playlist ---------- */
   var songs = (typeof SONGS !== 'undefined' && Array.isArray(SONGS)) ? SONGS : [];
@@ -40,10 +40,13 @@
   var iconPlay = document.getElementById('icon-play');
   var iconPause = document.getElementById('icon-pause');
   var presetsEl = document.getElementById('presets');
+  var stationsEl = document.getElementById('stations');
+  var lcdStationName = document.getElementById('lcd-station-name');
   var tracklistEl = document.getElementById('tracklist');
   var screensaverEl = document.getElementById('screensaver');
   var ssPanel = document.getElementById('ss-panel');
   var ssTitle = document.getElementById('ss-title');
+  var ssIdent = document.getElementById('ss-ident');
   var ssEqCanvas = document.getElementById('ss-eq');
   var embersCanvas = document.getElementById('embers');
 
@@ -55,9 +58,18 @@
   var shufflePos = 0;
   var pendingSeek = null;   // saved position to restore once metadata loads
   var seeking = false;      // user is dragging the seek bar
-  var durations = {};       // track index -> duration (seconds)
-  var presetMap = [];       // preset number (1-6) -> track index or null
+  var durations = {};       // global track index -> duration (seconds)
+  var presetMap = [];       // preset number (1-6) -> global track index or null
   var trackRows = [];
+
+  /* ---------- stations (FM bands) ----------
+     Every song lives on the main BROWNS FM band. A song with a
+     `station` field also appears on a band of that name. activeList
+     holds the GLOBAL song indices visible on the active band, and all
+     playback (next/prev/shuffle/presets/track list) works within it. */
+  var MAIN_STATION = 'BROWNS FM';
+  var activeStation = MAIN_STATION;
+  var activeList = [];
 
   /* audio graph (created lazily on first tap — iOS requirement) */
   var audioCtx = null;
@@ -78,8 +90,37 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
-  function trackFreq(index) {
-    return (87.9 + index * 0.4).toFixed(1);
+  // Ordered list of bands: main first, then each distinct station in
+  // playlist order.
+  function allStations() {
+    var list = [MAIN_STATION];
+    songs.forEach(function (s) {
+      if (s.station && list.indexOf(s.station) === -1) list.push(s.station);
+    });
+    return list;
+  }
+
+  // Global song indices belonging to a band.
+  function stationIndices(station) {
+    if (station === MAIN_STATION) {
+      return songs.map(function (_, i) { return i; });
+    }
+    var out = [];
+    songs.forEach(function (s, i) { if (s.station === station) out.push(i); });
+    return out;
+  }
+
+  // Each band gets its own frequency dial base for a distinct ident.
+  function stationBase(station) {
+    var idx = allStations().indexOf(station);
+    return idx <= 0 ? 87.9 : (100.1 + (idx - 1) * 3);
+  }
+
+  // Fake frequency for a track, based on its position on the active band.
+  function trackFreq(globalIndex) {
+    var pos = activeList.indexOf(globalIndex);
+    if (pos < 0) pos = 0;
+    return (stationBase(activeStation) + pos * 0.4).toFixed(1);
   }
 
   function isPlaying() {
@@ -93,7 +134,8 @@
         track: current,
         pos: audio.currentTime || 0,
         repeat: repeatMode,
-        shuffle: shuffleOn
+        shuffle: shuffleOn,
+        station: activeStation
       }));
     } catch (e) { /* storage unavailable — resume just won't work */ }
   }
@@ -199,12 +241,14 @@
     var song = songs[current];
     setLcdTitle(song.title || 'UNTITLED');
     lcdFreq.textContent = trackFreq(current);
+    if (lcdStationName) lcdStationName.textContent = activeStation.toUpperCase();
+    if (ssIdent) ssIdent.textContent = activeStation.toUpperCase();
     ssTitle.textContent = song.title || 'UNTITLED';
     // Subtle retune flash on genuine track changes (skip the first render).
     if (trackUiReady) flashLcdTitle();
     trackUiReady = true;
     trackRows.forEach(function (row, i) {
-      row.classList.toggle('current', i === current);
+      row.classList.toggle('current', activeList[i] === current);
     });
     presetMap.forEach(function (trackIndex, i) {
       var btn = presetsEl.children[i];
@@ -353,9 +397,15 @@
     else play();
   }
 
-  /* ---------- shuffle ---------- */
+  // Position of the current track within the active band.
+  function activePos() {
+    var p = activeList.indexOf(current);
+    return p < 0 ? 0 : p;
+  }
+
+  /* ---------- shuffle (within the active band) ---------- */
   function buildShuffleOrder(startIndex) {
-    shuffleOrder = songs.map(function (_, i) { return i; });
+    shuffleOrder = activeList.slice();
     for (var i = shuffleOrder.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var tmp = shuffleOrder[i];
@@ -373,7 +423,7 @@
   }
 
   function nextTrack(fromEnded) {
-    if (!hasTracks) return;
+    if (!hasTracks || !activeList.length) return;
     if (shuffleOn) {
       if (shufflePos + 1 < shuffleOrder.length) {
         shufflePos++;
@@ -385,10 +435,11 @@
       }
       loadTrack(shuffleOrder[shufflePos], true);
     } else {
-      if (current + 1 < songs.length) {
-        loadTrack(current + 1, true);
+      var pos = activePos();
+      if (pos + 1 < activeList.length) {
+        loadTrack(activeList[pos + 1], true);
       } else if (!fromEnded || repeatMode === REPEAT_ALL) {
-        loadTrack(0, true);
+        loadTrack(activeList[0], true);
       } else {
         stopAtEnd();
       }
@@ -396,7 +447,7 @@
   }
 
   function prevTrack() {
-    if (!hasTracks) return;
+    if (!hasTracks || !activeList.length) return;
     if (audio.currentTime > 3) {
       audio.currentTime = 0;
       return;
@@ -405,7 +456,8 @@
       shufflePos = (shufflePos - 1 + shuffleOrder.length) % shuffleOrder.length;
       loadTrack(shuffleOrder[shufflePos], true);
     } else {
-      loadTrack(current - 1, true);
+      var pos = activePos();
+      loadTrack(activeList[(pos - 1 + activeList.length) % activeList.length], true);
     }
   }
 
@@ -429,23 +481,25 @@
      presets
      ============================================================ */
   function buildPresets() {
-    // preset field wins; remaining buttons fill with unclaimed songs in order
+    // Presets map to the active band's songs. A song's `preset` field
+    // pins it to that slot (honoured within the band); the rest fill the
+    // remaining slots in order.
     presetMap = [null, null, null, null, null, null];
     var claimed = {};
-    songs.forEach(function (song, i) {
-      var p = song.preset;
+    activeList.forEach(function (gi) {
+      var p = songs[gi].preset;
       if (p >= 1 && p <= 6 && presetMap[p - 1] === null) {
-        presetMap[p - 1] = i;
-        claimed[i] = true;
+        presetMap[p - 1] = gi;
+        claimed[gi] = true;
       }
     });
-    var fill = 0;
+    var k = 0;
     for (var slot = 0; slot < 6; slot++) {
       if (presetMap[slot] !== null) continue;
-      while (fill < songs.length && claimed[fill]) fill++;
-      if (fill < songs.length) {
-        presetMap[slot] = fill;
-        claimed[fill] = true;
+      while (k < activeList.length && claimed[activeList[k]]) k++;
+      if (k < activeList.length) {
+        presetMap[slot] = activeList[k];
+        claimed[activeList[k]] = true;
       }
     }
 
@@ -470,6 +524,57 @@
   }
 
   /* ============================================================
+     stations (FM band selector)
+     ============================================================ */
+  function buildStations() {
+    if (!stationsEl) return;
+    var list = allStations();
+    stationsEl.innerHTML = '';
+    // Only worth showing a selector when there's more than the main band.
+    if (list.length <= 1) {
+      stationsEl.style.display = 'none';
+      return;
+    }
+    stationsEl.style.display = '';
+    list.forEach(function (name) {
+      var btn = document.createElement('button');
+      btn.className = 'btn-band';
+      btn.textContent = name.toUpperCase();
+      btn.setAttribute('data-station', name);
+      btn.setAttribute('aria-label', 'Tune to ' + name);
+      btn.addEventListener('click', function () { selectStation(name); });
+      stationsEl.appendChild(btn);
+    });
+  }
+
+  function updateStationUI() {
+    if (!stationsEl) return;
+    Array.prototype.forEach.call(stationsEl.children, function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-station') === activeStation);
+    });
+  }
+
+  // Tune to a band. Keeps the current song playing if it lives on the new
+  // band; otherwise starts that band's first song.
+  function selectStation(name) {
+    if (name === activeStation) return;
+    activeStation = name;
+    activeList = stationIndices(name);
+    buildPresets();
+    buildTracklist();
+    updateStationUI();
+    if (activeList.indexOf(current) === -1) {
+      var first = activeList.length ? activeList[0] : 0;
+      if (shuffleOn) buildShuffleOrder(first);
+      loadTrack(first, true); // band tap is a user gesture — playing is allowed
+    } else {
+      if (shuffleOn) buildShuffleOrder(current);
+      updateTrackUI(); // refresh ident/frequency/highlight for the new band
+      saveState();
+    }
+  }
+
+  /* ============================================================
      track list
      ============================================================ */
   // Track which rows have already animated in, so a re-render never
@@ -486,7 +591,8 @@
       tracklistEl.appendChild(li);
       return;
     }
-    songs.forEach(function (song, i) {
+    activeList.forEach(function (gi, i) {
+      var song = songs[gi];
       var row = document.createElement('li');
       var num = document.createElement('span');
       num.className = 't-num';
@@ -496,16 +602,16 @@
       title.textContent = song.title || 'Untitled';
       var dur = document.createElement('span');
       dur.className = 't-dur';
-      dur.textContent = '–:––';
+      dur.textContent = durations[gi] !== undefined ? fmtTime(durations[gi]) : '–:––';
       row.appendChild(num);
       row.appendChild(title);
       row.appendChild(dur);
       row.addEventListener('click', function () {
-        if (shuffleOn) buildShuffleOrder(i);
-        loadTrack(i, true);
+        if (shuffleOn) buildShuffleOrder(gi);
+        loadTrack(gi, true);
       });
       // Staggered fade-in from below — first appearance only.
-      var rowId = song.file || ('idx-' + i);
+      var rowId = song.file || ('idx-' + gi);
       if (!renderedRowIds.has(rowId)) {
         renderedRowIds.add(rowId);
         row.classList.add('row-in');
@@ -516,10 +622,12 @@
     });
   }
 
-  function setRowDuration(index, secs) {
-    durations[index] = secs;
-    var row = trackRows[index];
-    if (row) row.querySelector('.t-dur').textContent = fmtTime(secs);
+  function setRowDuration(globalIndex, secs) {
+    durations[globalIndex] = secs;
+    var pos = activeList.indexOf(globalIndex);
+    if (pos >= 0 && trackRows[pos]) {
+      trackRows[pos].querySelector('.t-dur').textContent = fmtTime(secs);
+    }
   }
 
   /* Populate durations lazily with one hidden probe element,
@@ -552,7 +660,7 @@
       navigator.mediaSession.metadata = new MediaMetadata({
         title: hasTracks ? (songs[current].title || 'Untitled') : 'Browns Radio',
         artist: 'Browns Radio',
-        album: 'BROWNS FM ' + (hasTracks ? trackFreq(current) : ''),
+        album: activeStation + ' ' + (hasTracks ? trackFreq(current) : ''),
         artwork: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }
@@ -836,6 +944,11 @@
      boot
      ============================================================ */
   function boot() {
+    // Default band = everything (BROWNS FM); restore the saved band below.
+    activeStation = MAIN_STATION;
+    activeList = stationIndices(MAIN_STATION);
+    buildStations();
+    updateStationUI();
     buildPresets();
     buildTracklist();
     updateModeUI();
@@ -865,10 +978,20 @@
         repeatMode = saved.repeat;
       }
       shuffleOn = !!saved.shuffle;
+      // Restore the saved band (if it still exists), then rebuild views.
+      if (saved.station && allStations().indexOf(saved.station) !== -1) {
+        activeStation = saved.station;
+        activeList = stationIndices(activeStation);
+        buildPresets();
+        buildTracklist();
+        updateStationUI();
+      }
       if (typeof saved.track === 'number' && saved.track >= 0 && saved.track < songs.length) {
         current = saved.track;
         if (typeof saved.pos === 'number' && saved.pos > 0) pendingSeek = saved.pos;
       }
+      // Keep the current track consistent with the active band.
+      if (activeList.indexOf(current) === -1) current = activeList.length ? activeList[0] : 0;
       updateModeUI();
     }
     if (shuffleOn) buildShuffleOrder(current);
